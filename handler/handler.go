@@ -66,3 +66,23 @@ func ShortenHandler(snowFlakeGen *snowflake.Snowflake, bloomFilter *bloom.BloomF
 		}
 	}
 }
+
+func RedirectHandler(urlStore *store.URLStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		select {
+		case <-ctx.Done():
+			http.Error(w, "Request timed out", http.StatusRequestTimeout)
+			return
+		default:
+			shortCode := r.URL.Path[1:]
+			if url, exists := urlStore.Get(shortCode); exists {
+				http.Redirect(w, r, url, http.StatusFound)
+				return
+			}
+			http.Error(w, "Short URL not found", http.StatusNotFound)
+		}
+	}
+}
